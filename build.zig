@@ -39,16 +39,16 @@ pub fn build(b: *std.Build) void {
     const lib = b.addLibrary(.{ .name = "ffmpeg", .root_module = b.createModule(.{
         .target = target,
         .optimize = optimize,
+        .link_libc = true,
     }) });
-    lib.linkLibrary(libz_dep.artifact("z"));
-    if (lazy_mbedtls_dep) |mbedtls_dep| lib.linkLibrary(mbedtls_dep.artifact("mbedtls"));
-    if (lazy_openssl_dep) |openssl_dep| lib.linkLibrary(openssl_dep.artifact("openssl"));
-    if (lazy_libressl_dep) |libressl_dep| lib.linkLibrary(libressl_dep.artifact("ssl"));
-    lib.linkLibrary(libmp3lame_dep.artifact("mp3lame"));
-    lib.linkLibrary(libvorbis_dep.artifact("vorbis"));
-    lib.linkLibrary(libogg_dep.artifact("ogg"));
-    lib.linkLibC();
-    lib.addIncludePath(b.path("."));
+    lib.root_module.linkLibrary(libz_dep.artifact("z"));
+    if (lazy_mbedtls_dep) |mbedtls_dep| lib.root_module.linkLibrary(mbedtls_dep.artifact("mbedtls"));
+    if (lazy_openssl_dep) |openssl_dep| lib.root_module.linkLibrary(openssl_dep.artifact("openssl"));
+    if (lazy_libressl_dep) |libressl_dep| lib.root_module.linkLibrary(libressl_dep.artifact("ssl"));
+    lib.root_module.linkLibrary(libmp3lame_dep.artifact("mp3lame"));
+    lib.root_module.linkLibrary(libvorbis_dep.artifact("vorbis"));
+    lib.root_module.linkLibrary(libogg_dep.artifact("ogg"));
+    lib.root_module.addIncludePath(b.path("."));
 
     const avconfig_h = b.addConfigHeader(.{
         .style = .blank,
@@ -57,7 +57,7 @@ pub fn build(b: *std.Build) void {
         .AV_HAVE_BIGENDIAN = t.cpu.arch.endian() == .big,
         .AV_HAVE_FAST_UNALIGNED = fastUnalignedLoads(t),
     });
-    lib.addConfigHeader(avconfig_h);
+    lib.root_module.addConfigHeader(avconfig_h);
 
     const common_config = .{
         .ARCH_AARCH64 = t.cpu.arch.isAARCH64(),
@@ -880,7 +880,7 @@ pub fn build(b: *std.Build) void {
         },
     }
     config_h.addValues(common_config);
-    lib.addConfigHeader(config_h);
+    lib.root_module.addConfigHeader(config_h);
 
     const config_components_h = b.addConfigHeader(.{
         .style = .blank,
@@ -3095,34 +3095,34 @@ pub fn build(b: *std.Build) void {
         .CONFIG_IPFS_GATEWAY_PROTOCOL = false,
         .CONFIG_IPNS_GATEWAY_PROTOCOL = false,
     });
-    lib.addConfigHeader(config_components_h);
+    lib.root_module.addConfigHeader(config_components_h);
 
     const sources = categorizeSources(b.allocator, t, switch (tls) {
         else => tls,
         .libressl => .openssl,
     });
 
-    lib.addCSourceFiles(.{
+    lib.root_module.addCSourceFiles(.{
         .files = sources.avcodec,
         .flags = ffmpeg_cflags ++ [_][]const u8{"-DBUILDING_avcodec"},
     });
-    lib.addCSourceFiles(.{
+    lib.root_module.addCSourceFiles(.{
         .files = sources.avutil,
         .flags = ffmpeg_cflags ++ [_][]const u8{"-DBUILDING_avutil"},
     });
-    lib.addCSourceFiles(.{
+    lib.root_module.addCSourceFiles(.{
         .files = sources.avformat,
         .flags = ffmpeg_cflags ++ [_][]const u8{"-DBUILDING_avformat"},
     });
-    lib.addCSourceFiles(.{
+    lib.root_module.addCSourceFiles(.{
         .files = sources.avfilter,
         .flags = ffmpeg_cflags ++ [_][]const u8{"-DBUILDING_avfilter"},
     });
-    lib.addCSourceFiles(.{
+    lib.root_module.addCSourceFiles(.{
         .files = sources.swresample,
         .flags = ffmpeg_cflags ++ [_][]const u8{"-DBUILDING_swresample"},
     });
-    lib.addCSourceFiles(.{
+    lib.root_module.addCSourceFiles(.{
         .files = sources.swscale,
         .flags = ffmpeg_cflags ++ [_][]const u8{"-DBUILDING_swscale"},
     });
@@ -3148,10 +3148,10 @@ pub fn build(b: *std.Build) void {
                 nasm_run.addDecoratedDirectoryArg("-I", b.path(std.fs.path.dirname(input_file).?), "/");
 
                 nasm_run.addArgs(&.{"--include"});
-                nasm_run.addFileArg(config_asm.getOutput());
+                nasm_run.addFileArg(config_asm.getOutputFile());
 
                 nasm_run.addArgs(&.{"-o"});
-                lib.addObjectFile(nasm_run.addOutputFileArg(output_basename));
+                lib.root_module.addObjectFile(nasm_run.addOutputFileArg(output_basename));
 
                 nasm_run.addFileArg(b.path(input_file));
             }
@@ -3177,10 +3177,10 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    show_metadata_c.addCSourceFiles(.{
+    show_metadata_c.root_module.addCSourceFiles(.{
         .files = &.{"doc/examples/show_metadata.c"},
     });
-    show_metadata_c.linkLibrary(lib);
+    show_metadata_c.root_module.linkLibrary(lib);
     b.installArtifact(show_metadata_c);
 
     const show_metadata_zig = b.addExecutable(.{
